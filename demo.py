@@ -6,29 +6,29 @@ from openai import AsyncOpenAI
 import os
 
 # === Setup DeepSeek API ===
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-your-api-key")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-a194d0c4c5364185ac916b8e19c65566")
 if not DEEPSEEK_API_KEY:
-    raise ValueError("请设置 DEEPSEEK_API_KEY 环境变量。")
+    raise ValueError("plz setup DEEPSEEK_API_KEY")
 
-client = AsyncOpenAI(
-    api_key=DEEPSEEK_API_KEY,
-    base_url="https://api.deepseek.com/v1"
-)
+# client = AsyncOpenAI(
+#     api_key=DEEPSEEK_API_KEY,
+#     base_url="https://api.deepseek.com/v1"
+# )
 
-settings = {
-    "model": "deepseek-chat",
-    "temperature": 0,
-}
+# settings = {
+#     "model": "deepseek-chat",
+#     "temperature": 0,
+# }
 
 # Works for qwen3:4b
-# client = AsyncOpenAI(
-#     api_key="ollama",
-#     base_url="http://localhost:11434/v1",
-# )
-# settings = {
-#     "model": "qwen3:4b",
-#     "temperature": 0,
-# } # Can not turn off reasoning: "chat_template_kwargs": {"enable_thinking": false}
+client = AsyncOpenAI(
+    api_key="ollama",
+    base_url="http://localhost:11434/v1",
+)
+settings = {
+    "model": "qwen3:4b",
+    "temperature": 0,
+} # Can not turn off reasoning: "chat_template_kwargs": {"enable_thinking": false}
 # === Store MCP tool metadata ===
 
 @cl.on_mcp_connect
@@ -100,7 +100,7 @@ async def on_message(message: cl.Message):
 
     # Step 2: Prepare base messages
     base_messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "system", "content": "You are a helpful assistant, you will use the same language as user to answer the question."},
         {"role": "user", "content": message.content}
     ]
 
@@ -147,15 +147,29 @@ async def on_message(message: cl.Message):
 
             await cl.Message(content=f"Tool `{tool_use['name']}` response:\n```json\n{result_text}\n```").send()
 
-        # Step 5: Summarize tool results
-        summary_prompt = "Here are the results from tools:\n"
+        # Step 5: Summarize tool results into a final answer
+        summary_prompt = f"""
+        User Question:
+        {message.content}
+
+        Tool Results:
+        """
         for output in tool_outputs:
             summary_prompt += f"\nTool: {output['name']}\nResult:\n{output['result']}\n"
-        summary_prompt += "\nPlease summarize the relevant findings or answer the user's original question based on this."
 
+        summary_prompt += """
+        Instructions:
+        1. Carefully read the tool outputs above.
+        2. Use ONLY the information in the tool results to answer the user's question.
+        3. Do NOT repeat tool results unless necessary — instead, directly answer the user.
+        4. Write the answer in the same language used in the user's question.
+        5. If the tool results are incomplete or unclear, politely indicate so.
+
+        Answer:
+        """
         summary_response = await client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that summarizes tool outputs."},
+                {"role": "system", "content": "You are a helpful assistant that answers user questions using only the results from tools. Use the same language as the user."},
                 {"role": "user", "content": summary_prompt}
             ],
             **settings

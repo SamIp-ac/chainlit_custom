@@ -1,4 +1,4 @@
-# uvicorn calculator_api:app --reload --port 8001
+# uvicorn calculator_api:app --reload --host 0.0.0.0 --port 8001
 import uvicorn
 from fastapi import FastAPI, Query
 from fastapi.responses import RedirectResponse
