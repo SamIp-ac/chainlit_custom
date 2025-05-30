@@ -9,7 +9,8 @@ from neo4j_graphrag.retrievers import VectorRetriever
 from fastapi_mcp import FastApiMCP
 
 # === Configuration ===
-NEO4J_URI = "neo4j://localhost:7687"
+IP_ADDRESS = "localhost" # local neo4j
+NEO4J_URI = f"neo4j://{IP_ADDRESS}:7687"
 NEO4J_AUTH = ("neo4j", "neo4jneo4j")
 NEO4J_DATABASE = "neo4j"
 VECTOR_INDEX_NAME = "myVectorIndex"
