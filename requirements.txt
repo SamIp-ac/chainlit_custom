@@ -4,3 +4,4 @@ fastapi
 uvicorn
 fastapi_mcp
 "neo4j_graphrag[ollama]"
+translators

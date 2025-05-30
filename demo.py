@@ -10,25 +10,25 @@ DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-a194d0c4c5364185ac916b
 if not DEEPSEEK_API_KEY:
     raise ValueError("plz setup DEEPSEEK_API_KEY")
 
-# client = AsyncOpenAI(
-#     api_key=DEEPSEEK_API_KEY,
-#     base_url="https://api.deepseek.com/v1"
-# )
+client = AsyncOpenAI(
+    api_key=DEEPSEEK_API_KEY,
+    base_url="https://api.deepseek.com/v1"
+)
 
-# settings = {
-#     "model": "deepseek-chat",
-#     "temperature": 0,
-# }
+settings = {
+    "model": "deepseek-chat",
+    "temperature": 0,
+}
 
 # Works for qwen3:4b
-client = AsyncOpenAI(
-    api_key="ollama",
-    base_url="http://localhost:11434/v1",
-)
-settings = {
-    "model": "qwen3:4b",
-    "temperature": 0,
-} # Can not turn off reasoning: "chat_template_kwargs": {"enable_thinking": false}
+# client = AsyncOpenAI(
+#     api_key="ollama",
+#     base_url="http://localhost:11434/v1",
+# )
+# settings = {
+#     "model": "qwen3:8b",
+#     "temperature": 0,
+# } # Can not turn off reasoning: "chat_template_kwargs": {"enable_thinking": false}
 # === Store MCP tool metadata ===
 
 @cl.on_mcp_connect

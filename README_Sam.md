@@ -24,6 +24,8 @@ uvicorn calculator_api:app --reload --host 0.0.0.0 --port 8001
 uvicorn flight_api:app --reload --host 0.0.0.0 --port 8002
 # data retriever, data on Sam's mac
 uvicorn data_retrievers:app --reload --host 0.0.0.0 --port 8003
+
+uvicorn kkday_api:app --reload --host 0.0.0.0 --port 8004
 ```
 
 On localhost:8000 Register your api by http://[HOST]:[PORT]/mcp
