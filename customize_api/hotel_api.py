@@ -1,7 +1,8 @@
-# uvicorn kkday_api:app --reload --host 0.0.0.0 --port 8004
+# uvicorn hotel_api:app --reload --host 0.0.0.0 --port 8005
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
+from datetime import date
 import time
 import random
 from selenium import webdriver
@@ -13,17 +14,18 @@ from translate import chinese_to_english
 from fastapi_mcp import FastApiMCP
 
 app = FastAPI(
-    title="KKday Attraction API",
-    description="API for checking KKday attraction ticket information",
+    title="KKday Hotel API",
+    description="API for checking KKday hotel information",
     version="1.0.0"
 )
 
-class AttractionInfo(BaseModel):
+class HotelInfo(BaseModel):
     name: str
+    description: str
     price: str
 
-class AttractionResponse(BaseModel):
-    attractions: List[AttractionInfo]
+class HotelResponse(BaseModel):
+    hotels: List[HotelInfo]
     total_count: int
 
 headers = {
@@ -43,12 +45,16 @@ def get_random_delay():
     """Generate random delay time"""
     return random.uniform(2, 4)
 
-def get_attractions(city_name: str) -> List[AttractionInfo]:
+def get_hotels(city_name: str, check_in: date, check_out: date, rooms: int = 1, adults: int = 2, children: int = 0) -> List[HotelInfo]:
     # Convert city name to English and lowercase
     city_english = chinese_to_english(city_name).lower()
     
+    # Format dates
+    check_in_str = check_in.strftime("%Y%m%d")
+    check_out_str = check_out.strftime("%Y%m%d")
+    
     # Build base URL
-    base_url = f"https://www.kkday.com/zh-tw/category/{city_english}/attraction-tickets/list/"
+    base_url = f"https://www.kkday.com/zh-tw/category/{city_english}/accommodation/list/"
     
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
@@ -65,8 +71,9 @@ def get_attractions(city_name: str) -> List[AttractionInfo]:
     for key, value in headers.items():
         chrome_options.add_argument(f'--header={key}: {value}')
 
-    attractions = []
+    hotels = []
     page = 1
+    max_pages = 3  # Maximum number of pages to scrape
     
     try:
         browser = webdriver.Chrome(options=chrome_options)
@@ -78,26 +85,26 @@ def get_attractions(city_name: str) -> List[AttractionInfo]:
             '''
         })
         
-        while True:
-            url = f"{base_url}?currency=HKD&sort=omdesc&page={page}&ccy=HKD"
+        while page <= max_pages:
+            url = f"{base_url}?currency=HKD&sort=hotel&check_in={check_in_str}&check_out={check_out_str}&rooms={rooms}&adults={adults}&children={children}&page={page}"
             print(f"Scraping page {page}...")
             
             browser.get(url)
             time.sleep(get_random_delay())
             
-            # Wait for product list to load
+            # Wait for hotel list to load
             wait = WebDriverWait(browser, 20)
             try:
                 wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.product-detail")))
             except:
-                print(f"No more products found on page {page}")
+                print(f"No more hotels found on page {page}")
                 break
             
-            # Get all products
-            products = browser.find_elements(By.CSS_SELECTOR, "div.product-detail")
+            # Get all hotels
+            hotel_elements = browser.find_elements(By.CSS_SELECTOR, "div.product-detail")
             
-            if not products:
-                print(f"No products found on page {page}")
+            if not hotel_elements:
+                print(f"No hotels found on page {page}")
                 break
                 
             # Check if reached last page
@@ -118,20 +125,28 @@ def get_attractions(city_name: str) -> List[AttractionInfo]:
                 print(f"Error checking pagination: {e}")
                 break
                 
-            for product in products:
+            for hotel in hotel_elements:
                 try:
-                    # Get attraction name
-                    name_element = product.find_element(By.CSS_SELECTOR, "span.product-listview__name")
-                    name = name_element.text.split(' ')[0]  # Only take Chinese name
+                    # Get hotel name
+                    name_element = hotel.find_element(By.CSS_SELECTOR, "span.product-listview__name")
+                    name = name_element.text.strip()
+                    
+                    # Get description
+                    description_element = hotel.find_element(By.CSS_SELECTOR, "p.description")
+                    description = description_element.text.strip()
                     
                     # Get price
-                    price_element = product.find_element(By.CSS_SELECTOR, "div.kk-price-local__normal")
+                    price_element = hotel.find_element(By.CSS_SELECTOR, "div.kk-price-local__normal")
                     price = f"HKD{price_element.text.strip()}"
                     
-                    attractions.append(AttractionInfo(name=name, price=price))
+                    hotels.append(HotelInfo(
+                        name=name,
+                        description=description,
+                        price=price
+                    ))
                     
                 except Exception as e:
-                    print(f"Error processing product: {e}")
+                    print(f"Error processing hotel: {e}")
                     continue
             
             page += 1
@@ -144,15 +159,30 @@ def get_attractions(city_name: str) -> List[AttractionInfo]:
         if 'browser' in locals():
             browser.quit()
     
-    return attractions
+    return hotels
 
-@app.get("/attractions/{city_name}", response_model=AttractionResponse)
-async def get_city_attractions(city_name: str):
+class HotelRequest(BaseModel):
+    city_name: str
+    check_in: date
+    check_out: date
+    rooms: Optional[int] = 1
+    adults: Optional[int] = 2
+    children: Optional[int] = 0
+
+@app.post("/hotels", response_model=HotelResponse)
+async def get_city_hotels(request: HotelRequest):
     try:
-        attractions = get_attractions(city_name)
-        return AttractionResponse(
-            attractions=attractions,
-            total_count=len(attractions)
+        hotels = get_hotels(
+            city_name=request.city_name,
+            check_in=request.check_in,
+            check_out=request.check_out,
+            rooms=request.rooms,
+            adults=request.adults,
+            children=request.children
+        )
+        return HotelResponse(
+            hotels=hotels,
+            total_count=len(hotels)
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -164,4 +194,4 @@ mcp.mount()
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8004)
+    uvicorn.run(app, host="0.0.0.0", port=8005) 
