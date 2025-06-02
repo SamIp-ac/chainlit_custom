@@ -40,14 +40,14 @@ headers = {
 }
 
 def get_random_delay():
-    """生成随机延迟时间"""
+    """Generate random delay time"""
     return random.uniform(2, 4)
 
 def get_attractions(city_name: str) -> List[AttractionInfo]:
-    # 转换城市名为英文并转为小写
+    # Convert city name to English and lowercase
     city_english = chinese_to_english(city_name).lower()
     
-    # 构建基础URL
+    # Build base URL
     base_url = f"https://www.kkday.com/zh-tw/category/{city_english}/attraction-tickets/list/"
     
     chrome_options = Options()
@@ -61,7 +61,7 @@ def get_attractions(city_name: str) -> List[AttractionInfo]:
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
     
-    # 添加所有请求头
+    # Add all request headers
     for key, value in headers.items():
         chrome_options.add_argument(f'--header={key}: {value}')
 
@@ -85,7 +85,7 @@ def get_attractions(city_name: str) -> List[AttractionInfo]:
             browser.get(url)
             time.sleep(get_random_delay())
             
-            # 等待产品列表加载
+            # Wait for product list to load
             wait = WebDriverWait(browser, 20)
             try:
                 wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.product-detail")))
@@ -93,18 +93,18 @@ def get_attractions(city_name: str) -> List[AttractionInfo]:
                 print(f"No more products found on page {page}")
                 break
             
-            # 获取所有产品
+            # Get all products
             products = browser.find_elements(By.CSS_SELECTOR, "div.product-detail")
             
             if not products:
                 print(f"No products found on page {page}")
                 break
                 
-            # 检查是否到达最后一页
+            # Check if reached last page
             try:
-                # 获取当前页码
+                # Get current page number
                 current_page = page
-                # 获取所有页码
+                # Get all page numbers
                 page_numbers = browser.find_elements(By.CSS_SELECTOR, "li.a-page a")
                 last_page = page_numbers[-1].text
                 
@@ -121,11 +121,11 @@ def get_attractions(city_name: str) -> List[AttractionInfo]:
                 
             for product in products:
                 try:
-                    # 获取景点名称
+                    # Get attraction name
                     name_element = product.find_element(By.CSS_SELECTOR, "span.product-listview__name")
-                    name = name_element.text.split(' ')[0]  # 只取中文名称
+                    name = name_element.text.split(' ')[0]  # Only take Chinese name
                     
-                    # 获取价格
+                    # Get price
                     price_element = product.find_element(By.CSS_SELECTOR, "div.kk-price-local__normal")
                     price = f"HKD{price_element.text.strip()}"
                     
