@@ -16,11 +16,21 @@ from enum import Enum
 app = FastAPI(
     title="Flight Price API",
     description="API for checking flight prices between cities",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/docs",
 )
 
 headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1'
 }
 
 class CabinClass(str, Enum):
@@ -133,7 +143,7 @@ def get_flight_price(origin_city, destination_city, departure_date, return_date=
 
     print(url)
     chrome_options = Options()
-    chrome_options.add_argument("--headless=new")  # Use new headless mode
+    # chrome_options.add_argument("--headless=new")  # Use new headless mode
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")  # Disable GPU acceleration

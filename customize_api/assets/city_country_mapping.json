@@ -1,0 +1,164 @@
+{
+    "china": {
+        "beijing": "cn",
+        "shanghai": "cn",
+        "guangzhou": "cn",
+        "shenzhen": "cn",
+        "chengdu": "cn",
+        "hangzhou": "cn",
+        "wuhan": "cn",
+        "xian": "cn",
+        "chongqing": "cn",
+        "qingdao": "cn",
+        "changsha": "cn",
+        "nanjing": "cn",
+        "xiamen": "cn",
+        "kunming": "cn",
+        "dalian": "cn",
+        "tianjin": "cn",
+        "zhengzhou": "cn",
+        "sanya": "cn",
+        "jinan": "cn",
+        "fuzhou": "cn"
+    },
+    "japan": {
+        "tokyo": "jp",
+        "osaka": "jp",
+        "kyoto": "jp",
+        "fukuoka": "jp",
+        "nagoya": "jp",
+        "sapporo": "jp",
+        "sendai": "jp",
+        "hiroshima": "jp",
+        "nagasaki": "jp",
+        "okinawa": "jp",
+        "niigata": "jp",
+        "okayama": "jp",
+        "kagoshima": "jp",
+        "komatsu": "jp",
+        "matsuyama": "jp"
+    },
+    "south korea": {
+        "seoul": "kr",
+        "busan": "kr",
+        "jeju": "kr",
+        "daegu": "kr",
+        "gwangju": "kr",
+        "incheon": "kr"
+    },
+    "thailand": {
+        "bangkok": "th",
+        "chiang mai": "th",
+        "phuket": "th",
+        "pattaya": "th",
+        "koh samui": "th",
+        "krabi": "th",
+        "chiang rai": "th",
+        "hat yai": "th",
+        "khon kaen": "th",
+        "udon thani": "th"
+    },
+    "singapore": {
+        "singapore": "sg"
+    },
+    "malaysia": {
+        "kuala lumpur": "my",
+        "penang": "my",
+        "langkawi": "my",
+        "malacca": "my",
+        "johor bahru": "my",
+        "kuching": "my",
+        "kota kinabalu": "my",
+        "kota kinabalu": "my",
+        "kuantan": "my",
+        "kuala terengganu": "my"
+    },
+    "indonesia": {
+        "jakarta": "id",
+        "bali": "id",
+        "surabaya": "id",
+        "bandung": "id",
+        "yogyakarta": "id",
+        "medan": "id",
+        "semarang": "id",
+        "palembang": "id",
+        "manado": "id",
+        "padang": "id"
+    },
+    "philippines": {
+        "manila": "ph",
+        "cebu": "ph",
+        "boracay": "ph",
+        "davao": "ph",
+        "clark": "ph",
+        "baguio": "ph",
+        "dumaguete": "ph",
+        "laoag": "ph",
+        "tagbilaran": "ph",
+        "puerto princesa": "ph"
+    },
+    "vietnam": {
+        "hanoi": "vn",
+        "ho chi minh city": "vn",
+        "da nang": "vn",
+        "nha trang": "vn",
+        "hoi an": "vn",
+        "halong bay": "vn",
+        "hue": "vn",
+        "dalat": "vn",
+        "phu quoc": "vn",
+        "can tho": "vn"
+    },
+    "cambodia": {
+        "phnom penh": "kh",
+        "siem reap": "kh",
+        "sihanoukville": "kh",
+        "battambang": "kh",
+        "kampot": "kh"
+    },
+    "myanmar": {
+        "yangon": "mm",
+        "mandalay": "mm",
+        "bagan": "mm",
+        "inle lake": "mm",
+        "naypyidaw": "mm"
+    },
+    "laos": {
+        "vientiane": "la",
+        "luang prabang": "la",
+        "vang vieng": "la",
+        "pakse": "la",
+        "savannakhet": "la"
+    },
+    "brunei": {
+        "bandar seri begawan": "bn",
+        "kuala belait": "bn",
+        "tutong": "bn",
+        "temburong": "bn"
+    },
+    "east timor": {
+        "dili": "tl",
+        "baucau": "tl",
+        "likisa": "tl",
+        "manatuto": "tl"
+    },
+    "hong kong": {
+        "hong kong": "hk"
+    },
+    "macau": {
+        "macau": "mo"
+    },
+    "taiwan": {
+        "taipei": "tw",
+        "kaohsiung": "tw",
+        "taichung": "tw",
+        "tainan": "tw",
+        "hualien": "tw",
+        "taitung": "tw",
+        "chiayi": "tw",
+        "hsinchu": "tw",
+        "keelung": "tw",
+        "yilan": "tw"
+    }
+}
+   

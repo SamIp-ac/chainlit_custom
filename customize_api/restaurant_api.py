@@ -82,7 +82,7 @@ def get_restaurants(city_name: str) -> List[RestaurantInfo]:
         })
         
         while page <= max_pages:
-            url = f"{base_url}?currency=HKD&sort=omdesc&page={page}"
+            url = f"{base_url}?currency=HKD&sort=omdesc&page={page}&ccy=HKD"
             print(f"Scraping page {page}...")
             
             browser.get(url)
