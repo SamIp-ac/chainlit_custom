@@ -20,7 +20,7 @@ settings = {
     "temperature": 0,
 }
 
-# Works for qwen3:4b
+# Works for qwen3:8b
 # client = AsyncOpenAI(
 #     api_key="ollama",
 #     base_url="http://localhost:11434/v1",
@@ -116,7 +116,7 @@ async def on_message(message: cl.Message):
 
     # Step 3: Prepare base messages
     base_messages = [
-        {"role": "system", "content": "You are a helpful assistant, you will use the same language as user to answer the question."}
+        {"role": "system", "content": "You are a helpful assistant of FUJIFILM Business Innovation, you will use the same language as user to answer the question, the newest."}
     ] + history
 
     # Step 4: Send to LLM with or without tools
