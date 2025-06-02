@@ -1,72 +1,78 @@
 # uvicorn calculator_api:app --reload --host 0.0.0.0 --port 8001
+
 import uvicorn
-from fastapi import FastAPI, Query
+import ast
+import operator as op
+from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi_mcp import FastApiMCP
 
-# 1. 初始化 FastAPI 应用，并添加标题和描述
+# 安全支持的運算符對應表
+operators = {
+    ast.Add: op.add,
+    ast.Sub: op.sub,
+    ast.Mult: op.mul,
+    ast.Div: op.truediv,
+    ast.USub: op.neg,
+    ast.Pow: op.pow,
+    ast.Mod: op.mod,
+    # 可按需增加
+}
+
+def safe_eval(expr: str):
+    """
+    使用 AST 安全地解析並計算數學表達式
+    """
+    def _eval(node):
+        if isinstance(node, ast.Num):  # 數字
+            return node.n
+        elif isinstance(node, ast.BinOp):  # 二元運算
+            return operators[type(node.op)](_eval(node.left), _eval(node.right))
+        elif isinstance(node, ast.UnaryOp):  # 單目運算（如 -1）
+            return operators[type(node.op)](_eval(node.operand))
+        else:
+            raise ValueError("不支持的表達式類型")
+
+    try:
+        tree = ast.parse(expr, mode='eval')
+        return _eval(tree.body)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"表達式無效: {str(e)}")
+
+# 初始化 FastAPI 應用
 app = FastAPI(
-    title="简单计算器 API",
-    description="这是一个提供两个数字加法和乘法运算的 API。所有操作都在此单一文档页面上可用。",
-    version="1.0.0",
+    title="進階計算器 API",
+    description="支援四則運算與複雜表達式解析的計算器，適用於 FastAPI-MCP。",
+    version="2.0.0",
 )
 
-# 2. 定义 API 端点
-
-@app.get("/add", summary="两数相加", tags=["数学运算"])
-async def add_numbers(
-    num1: float = Query(..., description="第一个加数。"),
-    num2: float = Query(..., description="第二个加数。")
+@app.get("/calculate", summary="執行數學運算", tags=["數學計算"])
+async def calculate(
+    expression: str = Query(..., description="數學表達式，如 '1 + 2 * (3 + 4)'")
 ):
     """
-    接收两个数字 **num1** 和 **num2** 作为查询参数，并返回它们的和。
+    計算指定的數學表達式。
 
-    - **num1**: 浮点数，必需。
-    - **num2**: 浮点数，必需。
+    - **expression**: 輸入的表達式，如：
+      - `1 + 2`
+      - `3 * (4 + 5)`
+      - `10 / (2 + 3)`
 
-    示例请求: `/add?num1=5.5&num2=4.5`
+    🚫 不允許任意 Python 代碼，只允許四則運算。
     """
-    result = num1 + num2
+    result = safe_eval(expression)
     return {
-        "operation": "addition",
-        "num1": num1,
-        "num2": num2,
-        "sum": result
+        "expression": expression,
+        "result": result
     }
 
-@app.get("/multiply", summary="两数相乘", tags=["数学运算"])
-async def multiply_numbers(
-    num1: float = Query(..., description="第一个乘数。"),
-    num2: float = Query(..., description="第二个乘数。")
-):
-    """
-    接收两个数字 **num1** 和 **num2** 作为查询参数，并返回它们的积。
-
-    - **num1**: 浮点数，必需。
-    - **num2**: 浮点数，必需。
-
-    示例请求: `/multiply?num1=3&num2=7`
-    """
-    result = num1 * num2
-    return {
-        "operation": "multiplication",
-        "num1": num1,
-        "num2": num2,
-        "product": result
-    }
-
-# 3. (可选) 添加一个根路径重定向到文档页面
-@app.get("/", include_in_schema=False) # include_in_schema=False 表示不在 API 文档中显示此端点
+@app.get("/", include_in_schema=False)
 async def root_redirect_to_docs():
     return RedirectResponse(url="/docs")
 
+# 啟用 MCP
 mcp = FastApiMCP(app)
-
-# Mount the MCP server directly to your FastAPI app
 mcp.mount()
-# 4. 运行 FastAPI 应用 (如果你直接运行此脚本)
+
 if __name__ == "__main__":
-    # 运行命令: uvicorn calculator_api.py:app --reload --port 8001
-    # 例如，如果你的文件名是 main.py, 则运行: uvicorn main:app --reload --port 8001
-    # 然后在浏览器中打开 http://127.0.0.1:8080/docs 查看 API 文档
     uvicorn.run(app, host="0.0.0.0", port=8001)

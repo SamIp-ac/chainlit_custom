@@ -7,20 +7,29 @@ from chainlit.logger import logger
 from ._utils import is_path_inside
 
 # Default chainlit.md file created if none exists
-DEFAULT_MARKDOWN_STR = """# Welcome to Chainlit! 🚀🤖
+DEFAULT_MARKDOWN_STR = """# Welcome to Fujifilm MCP Chatbot! 
 
-Hi there, Developer! 👋 We're excited to have you on board. Chainlit is a powerful tool designed to help you prototype, debug and share applications built on top of LLMs.
+FujiFilm Business Innovation has a long-standing history in imaging and information technology with continuous innovation. The Hong Kong branch is committed to providing leading business solutions for local enterprises.
 
-## Useful Links 🔗
+## 🔧 Model Context Protocol (MCP)
 
-- **Documentation:** Get started with our comprehensive [Chainlit Documentation](https://docs.chainlit.io) 📚
-- **Discord Community:** Join our friendly [Chainlit Discord](https://discord.gg/k73SQ3FyUh) to ask questions, share your projects, and connect with other developers! 💬
+- MCP = a standard for LLMs to use external tools and context.
 
-We can't wait to see what you create with Chainlit! Happy coding! 💻😊
+- Allows models to dynamically call tools (e.g. web search, APIs, 3D engines).
 
-## Welcome screen
+- Enables multi-step, tool-augmented reasoning.
 
-To modify the welcome screen, edit the `chainlit.md` file at the root of your project. If you do not want a welcome screen, just leave this file empty.
+- Makes LLMs more interactive, powerful, and autonomous.
+
+## 🤖 A2A (Agent-to-Agent)
+
+- A design pattern where multiple specialized agents collaborate.
+
+- Each agent handles a distinct capability or domain (e.g., web search, database access, MCP tools).
+
+- Agents communicate with each other via messages or task passing.
+
+- Enables scalable, multi-step reasoning by delegating subtasks.
 """
 
 

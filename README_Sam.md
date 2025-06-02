@@ -11,9 +11,10 @@ pip install -r requirements.txt
 chainlit run demo.py -w
 # open IP and port for others
 chainlit run demo.py -w --host 0.0.0.0 --port 8000
-# OPEN localhost:8000 not 0.0.0.0:8000
-```
+# BIG REMARK!!!!!!! OPEN localhost:8000 instead of 0.0.0.0:8000
 
+```
+## demo_iter_mcp.py is simulate more iteration on mcp calling, u may run it if u want
 
 terminal n:
 ```shell
