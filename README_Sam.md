@@ -18,14 +18,18 @@ chainlit run demo.py -w --host 0.0.0.0 --port 8000
 
 terminal n:
 ```shell
-cd customize_api
+
 # add and multipler calculator
+cd customize_api
 uvicorn calculator_api:app --reload --host 0.0.0.0 --port 8001
 # check flight ticket
+cd customize_api
 uvicorn flight_api:app --reload --host 0.0.0.0 --port 8002
 # data retriever, data on Sam's mac
+cd customize_api
 uvicorn data_retrievers:app --reload --host 0.0.0.0 --port 8003
-
+# Find attractions
+cd customize_api
 uvicorn kkday_api:app --reload --host 0.0.0.0 --port 8004
 ```
 
