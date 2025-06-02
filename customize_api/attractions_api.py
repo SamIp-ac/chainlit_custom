@@ -67,6 +67,7 @@ def get_attractions(city_name: str) -> List[AttractionInfo]:
 
     attractions = []
     page = 1
+    max_pages = 3  # Maximum number of pages to scrape
     
     try:
         browser = webdriver.Chrome(options=chrome_options)
@@ -78,7 +79,7 @@ def get_attractions(city_name: str) -> List[AttractionInfo]:
             '''
         })
         
-        while True:
+        while page <= max_pages:
             url = f"{base_url}?currency=HKD&sort=omdesc&page={page}&ccy=HKD"
             print(f"Scraping page {page}...")
             

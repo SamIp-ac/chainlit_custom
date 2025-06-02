@@ -3,5 +3,5 @@ neo4j-graphrag==1.7.0
 fastapi
 uvicorn
 fastapi_mcp
-"neo4j_graphrag[ollama]"
+neo4j-graphrag[ollama]
 translators
