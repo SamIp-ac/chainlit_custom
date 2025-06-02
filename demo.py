@@ -81,6 +81,18 @@ async def call_tool(tool_use):
     return result
 
 
+MAX_HISTORY = 6  # Number of previous messages to keep
+
+def get_chat_history():
+    return cl.user_session.get("chat_history", [])
+
+def add_to_chat_history(role: str, content: str):
+    history = get_chat_history()
+    history.append({"role": role, "content": content})
+    # Keep only the latest N messages
+    history = history[-MAX_HISTORY:]
+    cl.user_session.set("chat_history", history)
+
 # === Handle message and tools with LLM ===
 @cl.on_message
 async def on_message(message: cl.Message):
@@ -98,13 +110,16 @@ async def on_message(message: cl.Message):
         for conn_tools in mcp_tools.values() for t in conn_tools
     ]
 
-    # Step 2: Prepare base messages
-    base_messages = [
-        {"role": "system", "content": "You are a helpful assistant, you will use the same language as user to answer the question."},
-        {"role": "user", "content": message.content}
-    ]
+    # Step 2: Build history + new message
+    history = get_chat_history()
+    history.append({"role": "user", "content": message.content})
 
-    # Step 3: Send to LLM with or without tools
+    # Step 3: Prepare base messages
+    base_messages = [
+        {"role": "system", "content": "You are a helpful assistant, you will use the same language as user to answer the question."}
+    ] + history
+
+    # Step 4: Send to LLM with or without tools
     if tool_defs:
         response = await client.chat.completions.create(
             messages=base_messages,
@@ -119,9 +134,15 @@ async def on_message(message: cl.Message):
         )
 
     msg = response.choices[0].message
+
+    # Store current messages to history
+    add_to_chat_history("user", message.content)
+    if msg.content:
+        add_to_chat_history("assistant", msg.content)
+
     tool_outputs = []
 
-    # Step 4: If tools were used
+    # Step 5: If tools were used
     if msg.tool_calls:
         for tool_call in msg.tool_calls:
             tool_use = {
@@ -147,7 +168,7 @@ async def on_message(message: cl.Message):
 
             await cl.Message(content=f"Tool `{tool_use['name']}` response:\n```json\n{result_text}\n```").send()
 
-        # Step 5: Summarize tool results into a final answer
+        # Step 6: Summarize tool results into a final answer
         summary_prompt = f"""
         User Question:
         {message.content}
