@@ -16,16 +16,22 @@ chainlit run demo.py -w --host 0.0.0.0 --port 8000
 ```
 ## demo_iter_mcp.py is simulate more iteration on mcp calling, u may run it if u want
 
-terminal n:
+## REMOVE watermark:
+add: ```custom_css = "/public/custom_styles.css"``` under "[UI]" in file: ".chainlit/config.toml"
+
+## In different terminal:
 ```shell
-cd customize_api
 # add and multipler calculator
+cd customize_api
 uvicorn calculator_api:app --reload --host 0.0.0.0 --port 8001
 # check flight ticket
+cd customize_api
 uvicorn flight_api:app --reload --host 0.0.0.0 --port 8002
 # data retriever, data on Sam's mac
+cd customize_api
 uvicorn data_retrievers:app --reload --host 0.0.0.0 --port 8003
-
+# Find attractions
+cd customize_api
 uvicorn kkday_api:app --reload --host 0.0.0.0 --port 8004
 ```
 

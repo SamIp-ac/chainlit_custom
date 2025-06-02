@@ -1,0 +1,9 @@
+/* To hide an element with the class 'watermark' */
+.watermark {
+    display: none !important;
+  }
+  
+  /* Or, if you find a more specific class from inspecting the element */
+  .css-1705j0v { /* This is an example class, find the actual one */
+    visibility: hidden !important;
+  }
