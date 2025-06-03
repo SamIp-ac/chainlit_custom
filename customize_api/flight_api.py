@@ -2,7 +2,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from datetime import date
-from typing import Optional
+from typing import Optional, List
 import json
 import time
 from selenium import webdriver
@@ -210,7 +210,26 @@ def build_kayak_url(origin_code, dest_code, departure_date, return_date=None,
     # Combine complete URL
     return f"{base_url}/{route}/{date_part}/{passenger_part}?{query_params}&fs=stops=~0"
 
-def get_flight_price(origin_city, destination_city, departure_date, return_date=None, adults=1, students=0, youth=0, children=0, seated_infant=0, lap_infant=0, cabin_class=CabinClass.ECONOMY):
+class FlightInfo(BaseModel):
+    departure_time: str
+    arrival_time: str
+    departure_airport: str
+    arrival_airport: str
+    duration: str
+    stops: str
+    next_day_arrival: bool = False
+
+class FlightResponse(BaseModel):
+    origin: str
+    destination: str
+    departure_date: date
+    return_date: Optional[date] = None
+    cabin_class: CabinClass
+    price: str
+    outbound_flight: FlightInfo
+    return_flight: Optional[FlightInfo] = None
+
+def get_flight_info(origin_city, destination_city, departure_date, return_date=None, adults=1, students=0, youth=0, children=0, seated_infant=0, lap_infant=0, cabin_class=CabinClass.ECONOMY):
     origin_code = get_citycode(origin_city)
     dest_code = get_citycode(destination_city)
 
@@ -231,16 +250,16 @@ def get_flight_price(origin_city, destination_city, departure_date, return_date=
 
     print(url)
     chrome_options = Options()
-    chrome_options.add_argument("--headless=new")  # Use new headless mode
+    chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")  # Disable GPU acceleration
-    chrome_options.add_argument("--window-size=1920,1080")  # Set window size
-    chrome_options.add_argument("--start-maximized")  # Maximize window
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")  # Disable automation control features
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])  # Exclude automation switches
-    chrome_options.add_experimental_option('useAutomationExtension', False)  # Disable automation extension
-    chrome_options.add_argument(f'user-agent={headers["User-Agent"]}')  # Set user agent
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("--start-maximized")
+    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
+    chrome_options.add_argument(f'user-agent={headers["User-Agent"]}')
 
     try:
         print('start')
@@ -251,16 +270,15 @@ def get_flight_price(origin_city, destination_city, departure_date, return_date=
                     get: () => undefined
                 })
             '''
-        })  # Modify webdriver features
+        })
         browser.set_page_load_timeout(10000)
         browser.get(url)
 
-        # Increase wait time to ensure page is fully loaded
-        time.sleep(5)  # Add fixed wait time
+        time.sleep(5)
 
-        wait = WebDriverWait(browser, 200)  # Set reasonable wait time
+        wait = WebDriverWait(browser, 200)
         
-        # Get the single price
+        # Get price
         try:
             price_element = wait.until(
                 EC.visibility_of_element_located((By.CSS_SELECTOR, "div.e2GB-price-text"))
@@ -271,9 +289,75 @@ def get_flight_price(origin_city, destination_city, departure_date, return_date=
             print(f"Error getting price: {str(e)}")
             price = None
 
+        # Get flight information
+        outbound_flight = None
+        return_flight = None
+        
+        try:
+            # Get the first flight list (cheapest option)
+            flight_list = wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "ol.hJSA-list"))
+            )
+            
+            # Get all flight items in the list
+            flight_items = flight_list.find_elements(By.CSS_SELECTOR, "li.hJSA-item")
+            
+            # Process each flight item
+            for i, flight in enumerate(flight_items):
+                try:
+                    # Get times
+                    times = flight.find_element(By.CSS_SELECTOR, "div.vmXl-mod-variant-large").text
+                    departure_time, arrival_time = times.split(" – ")
+                    
+                    # Check for next day arrival
+                    next_day = False
+                    if "+1" in arrival_time:
+                        next_day = True
+                        arrival_time = arrival_time.replace("+1", "").strip()
+                    
+                    # Get airports
+                    airports = flight.find_elements(By.CSS_SELECTOR, "div.c_cgF-mod-variant-full-airport-wide")
+                    departure_airport_info = airports[0].find_element(By.CSS_SELECTOR, "span.jLhY-airport-info").text.split()
+                    arrival_airport_info = airports[1].find_element(By.CSS_SELECTOR, "span.jLhY-airport-info").text.split()
+                    
+                    departure_airport = departure_airport_info[0]
+                    arrival_airport = arrival_airport_info[0]
+                    
+                    # Get duration and stops
+                    duration = flight.find_element(By.CSS_SELECTOR, "div.xdW8-mod-full-airport div.vmXl").text
+                    stops = flight.find_element(By.CSS_SELECTOR, "span.JWEO-stops-text").text
+                    
+                    flight_info = FlightInfo(
+                        departure_time=departure_time,
+                        arrival_time=arrival_time,
+                        departure_airport=departure_airport,
+                        arrival_airport=arrival_airport,
+                        duration=duration,
+                        stops=stops,
+                        next_day_arrival=next_day
+                    )
+                    
+                    # First flight is always outbound, second is return (if exists)
+                    if i == 0:
+                        outbound_flight = flight_info
+                    elif i == 1:
+                        return_flight = flight_info
+                        
+                except Exception as e:
+                    print(f"Error parsing flight info: {str(e)}")
+                    continue
+
+        except Exception as e:
+            print(f"Error getting flight list: {str(e)}")
+
         browser.execute_script("window.stop();")
-        browser.quit()  # Close browser
-        return price
+        browser.quit()
+        
+        return {
+            "price": price,
+            "outbound_flight": outbound_flight,
+            "return_flight": return_flight
+        }
 
     except Exception as e:
         print("Not found:", e)
@@ -311,10 +395,10 @@ EXAMPLE:
 }
 '''
 
-@app.post("/flight-price")
-async def check_flight_price(request: FlightRequest):
+@app.post("/flight-info")
+async def check_flight_info(request: FlightRequest):
     try:
-        price = get_flight_price(
+        result = get_flight_info(
             origin_city=request.origin_city,
             destination_city=request.destination_city,
             departure_date=request.departure_date,
@@ -328,17 +412,19 @@ async def check_flight_price(request: FlightRequest):
             cabin_class=request.cabin_class
         )
         
-        if price is None:
-            raise HTTPException(status_code=404, detail="Flight price not found")
+        if result is None or result["outbound_flight"] is None:
+            raise HTTPException(status_code=404, detail="Flight information not found")
             
-        return {
-            "origin": request.origin_city,
-            "destination": request.destination_city,
-            "departure_date": request.departure_date,
-            "return_date": request.return_date,
-            "cabin_class": request.cabin_class,
-            "price": price
-        }
+        return FlightResponse(
+            origin=request.origin_city,
+            destination=request.destination_city,
+            departure_date=request.departure_date,
+            return_date=request.return_date,
+            cabin_class=request.cabin_class,
+            price=result["price"],
+            outbound_flight=result["outbound_flight"],
+            return_flight=result["return_flight"]
+        )
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

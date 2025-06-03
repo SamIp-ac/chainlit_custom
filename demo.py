@@ -6,17 +6,31 @@ from openai import AsyncOpenAI
 import os
 
 # === Setup DeepSeek API ===
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-a194d0c4c5364185ac916b8e19c65566")
+# DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-a194d0c4c5364185ac916b8e19c65566")
+# if not DEEPSEEK_API_KEY:
+#     raise ValueError("plz setup DEEPSEEK_API_KEY")
+
+# client = AsyncOpenAI(
+#     api_key=DEEPSEEK_API_KEY,
+#     base_url="https://api.deepseek.com/v1"
+# )
+
+# settings = {
+#     "model": "deepseek-chat",
+#     "temperature": 0,
+# }
+
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "AIzaSyAwfBOvz97HBIapwwV-Y9o8Kvxq6n0cuUM")
 if not DEEPSEEK_API_KEY:
     raise ValueError("plz setup DEEPSEEK_API_KEY")
 
 client = AsyncOpenAI(
     api_key=DEEPSEEK_API_KEY,
-    base_url="https://api.deepseek.com/v1"
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
 )
 
 settings = {
-    "model": "deepseek-chat",
+    "model": "gemini-2.5-flash-preview-04-17",
     "temperature": 0,
 }
 
