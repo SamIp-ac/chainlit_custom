@@ -81,6 +81,7 @@ async def call_tool(tool_use):
     return result
 
 
+# TODO: for general file upload : https://docs.chainlit.io/advanced-features/multi-modal
 MAX_HISTORY = 6  # Number of previous messages to keep
 
 def get_chat_history():
@@ -116,7 +117,9 @@ async def on_message(message: cl.Message):
 
     # Step 3: Prepare base messages
     base_messages = [
-        {"role": "system", "content": "You are a helpful assistant of FUJIFILM Business Innovation, you will use the same language as user to answer the question, the newest."}
+        {"role": "system", "content": "You are a helpful assistant of FUJIFILM Business Innovation, you will use the same language as user to answer the question, the newest chat history at last."
+        "If the user question requires analyzing a document, especially a PDF, "
+        "say: '📝 Please upload a PDF file so I can help you.'"}
     ] + history
 
     # Step 4: Send to LLM with or without tools
@@ -135,11 +138,53 @@ async def on_message(message: cl.Message):
 
     msg = response.choices[0].message
 
+    # # Store current messages to history
+    # add_to_chat_history("user", message.content)
+    # if msg.content:
+    #     add_to_chat_history("assistant", msg.content)
+
     # Store current messages to history
     add_to_chat_history("user", message.content)
     if msg.content:
         add_to_chat_history("assistant", msg.content)
 
+    # 🔍 Check if model is asking for a PDF
+    if msg.content and "upload a pdf" in msg.content.lower():
+        await cl.Message(content=msg.content).send()
+
+        # Ask for file
+        files = await cl.AskFileMessage(
+            content="📄 Upload your PDF file here.",
+            accept=["application/pdf"],
+            max_files=1
+        ).send()
+
+        file = files[0]
+
+        # Extract text from PDF using pdfminer
+        from pdfminer.high_level import extract_text
+        from io import BytesIO
+
+        try:
+            text = extract_text(file.path)
+        except Exception as e:
+            await cl.Message(content=f"❌ Could not read PDF: {e}").send()
+            return
+
+        # Optionally summarize or chunk text
+        summary_prompt = f"The user uploaded the following document:\n\n{text}\n\nPlease summarize it or help based on the user's original request:\n\n{message.content}"
+        print(summary_prompt)
+        followup_response = await client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": summary_prompt}
+            ],
+            **settings
+        )
+        print(followup_response.choices[0].message.content)
+
+        await cl.Message(content=followup_response.choices[0].message.content).send()
+        return
     tool_outputs = []
 
     # Step 5: If tools were used
