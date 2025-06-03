@@ -208,7 +208,7 @@ def build_kayak_url(origin_code, dest_code, departure_date, return_date=None,
     query_params = "sort=price_a"
 
     # Combine complete URL
-    return f"{base_url}/{route}/{date_part}/{passenger_part}?{query_params}"
+    return f"{base_url}/{route}/{date_part}/{passenger_part}?{query_params}&fs=stops=~0"
 
 def get_flight_price(origin_city, destination_city, departure_date, return_date=None, adults=1, students=0, youth=0, children=0, seated_infant=0, lap_infant=0, cabin_class=CabinClass.ECONOMY):
     origin_code = get_citycode(origin_city)
