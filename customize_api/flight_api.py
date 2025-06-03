@@ -12,6 +12,29 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from fastapi_mcp import FastApiMCP
 from enum import Enum
+import requests
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+
+# Load environment variables
+load_dotenv()
+
+# Setup DeepSeek API
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-a194d0c4c5364185ac916b8e19c65566")
+if not DEEPSEEK_API_KEY:
+    raise ValueError("Please setup DEEPSEEK_API_KEY")
+
+client = OpenAI(
+    api_key=DEEPSEEK_API_KEY,
+    base_url="https://api.deepseek.com/v1"
+)
+
+settings = {
+    "model": "deepseek-chat",
+    "temperature": 0,
+    "response_format": { "type": "json_object" }  # Force JSON response
+}
 
 app = FastAPI(
     title="Flight Price API",
@@ -40,15 +63,80 @@ class CabinClass(str, Enum):
     FIRST = "first"         # First class
 
 def get_citycode(cityname):
+    """Get city code with intelligent matching using DeepSeek API"""
     with open('assets/cities.json', 'r', encoding='utf-8') as json_file:
         city_data = json.load(json_file)
 
-    citycode = city_data.get(cityname)
+    # First try direct match
+    # citycode = city_data.get(cityname)
+    # if citycode:
+    #     return citycode
 
-    if citycode:
-        return citycode
-    else:
-        return f"City '{cityname}' not found."
+    # If no direct match, use DeepSeek API for intelligent matching
+    try:
+        # Get an example city code for the prompt
+        example_city = next(iter(city_data.items()))
+        example_response = json.dumps({"citycode": example_city[1]}, ensure_ascii=False)
+        not_found_response = json.dumps({"citycode": "NOT_FOUND"}, ensure_ascii=False)
+
+        # Prepare the prompt for DeepSeek
+        messages = [
+            {"role": "system", "content": f"""You are a helpful assistant that matches city names to their codes.
+            You must ALWAYS respond in JSON format with a single field 'citycode'.
+            
+            Important matching rules:
+            1. If the input contains both country and city (e.g., "日本东京"), extract and match only the city part ("东京")
+            2. Match should be case-insensitive
+            3. Consider both traditional and simplified Chinese characters
+            4. Match partial names if they are unique (e.g., "东京" should match "东京")
+            5. If multiple matches exist, choose the most common/popular one
+            
+            Example responses:
+            - For a match: {example_response}
+            - For no match: {not_found_response}"""},
+            {"role": "user", "content": f"""Given the following city name: "{cityname}", find the most likely matching city code from this list:
+            {json.dumps(city_data, ensure_ascii=False, indent=2)}
+            
+            Matching considerations:
+            1. If input contains country name (e.g., "日本东京"), match only the city part ("东京")
+            2. Traditional/Simplified Chinese variations
+            3. Common abbreviations and alternative names
+            4. Common typos and misspellings
+            5. Partial matches if they are unique
+            
+            Return ONLY a JSON object with a single field 'citycode' containing the matched code or 'NOT_FOUND'.
+            Example format: {example_response}"""}
+        ]
+
+        print(f"Attempting to match city: {cityname}")
+        response = client.chat.completions.create(
+            messages=messages,
+            **settings
+        )
+
+        try:
+            result = json.loads(response.choices[0].message.content)
+            matched_code = result.get('citycode')
+            print(f"DeepSeek matched code: {matched_code}")
+            
+            # Verify the matched code exists in our data
+            if matched_code in city_data.values():
+                return matched_code
+            elif matched_code != 'NOT_FOUND':
+                # If DeepSeek returned a code but it's not in our data, try to find the closest match
+                for code in city_data.values():
+                    if code.lower() in matched_code.lower() or matched_code.lower() in code.lower():
+                        return code
+
+            print(f"DeepSeek API matching failed for city: {cityname}")
+            return None
+        except json.JSONDecodeError as e:
+            print(f"Error parsing JSON response: {str(e)}")
+            return None
+
+    except Exception as e:
+        print(f"Error in intelligent city matching: {str(e)}")
+        return None
 
 def build_kayak_url(origin_code, dest_code, departure_date, return_date=None, 
                    adults=1, students=0, youth=0, children=0, seated_infant=0, lap_infant=0,

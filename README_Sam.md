@@ -35,10 +35,10 @@ cd customize_api
 uvicorn attractions_api:app --reload --host 0.0.0.0 --port 8004
 # Find hotel
 cd customize_api
-uvicorn hotel_api:app --reload --host 0.0.0.0 --port 8006
+uvicorn hotel_api:app --reload --host 0.0.0.0 --port 8005
 # Find restaurant
 cd customize_api
-uvicorn restaurant_api:app --reload --host 0.0.0.0 --port 8007
+uvicorn restaurant_api:app --reload --host 0.0.0.0 --port 8006
 ```
 
 On localhost:8000 Register your api by http://[HOST]:[PORT]/mcp
