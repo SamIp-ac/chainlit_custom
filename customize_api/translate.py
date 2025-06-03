@@ -13,5 +13,3 @@ def chinese_to_english(city_name):
     except Exception as e:
         print(f"Translation error: {e}")
         return city_name  # Return original name if translation fails
-
-def 

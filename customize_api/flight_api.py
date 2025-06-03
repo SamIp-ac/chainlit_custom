@@ -231,7 +231,7 @@ def get_flight_price(origin_city, destination_city, departure_date, return_date=
 
     print(url)
     chrome_options = Options()
-    # chrome_options.add_argument("--headless=new")  # Use new headless mode
+    chrome_options.add_argument("--headless=new")  # Use new headless mode
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")  # Disable GPU acceleration
@@ -260,22 +260,19 @@ def get_flight_price(origin_city, destination_city, departure_date, return_date=
 
         wait = WebDriverWait(browser, 200)  # Set reasonable wait time
         
-        # First try to find the total price for multiple passengers
+        # Get the single price
         try:
-            total_price_element = wait.until(
-                EC.visibility_of_element_located((By.CSS_SELECTOR, "div.f8F1-multiple-ptc-price-label"))
-            )
-            price = total_price_element.text.replace("總價HK$", "").replace(",", "").strip()
-        except:
-            # If total price not found, get the single passenger price
-            first_price_element = wait.until(
+            price_element = wait.until(
                 EC.visibility_of_element_located((By.CSS_SELECTOR, "div.e2GB-price-text"))
             )
-            price = first_price_element.text.replace("HK$", "").replace(",", "").strip()
+            price = price_element.text.replace("HK$", "").replace(",", "").strip()
+            print(f"Found price: {price}")
+        except Exception as e:
+            print(f"Error getting price: {str(e)}")
+            price = None
 
         browser.execute_script("window.stop();")
         browser.quit()  # Close browser
-        print(price)
         return price
 
     except Exception as e:
