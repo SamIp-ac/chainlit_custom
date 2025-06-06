@@ -67,12 +67,6 @@ def get_citycode(cityname):
     with open('assets/cities.json', 'r', encoding='utf-8') as json_file:
         city_data = json.load(json_file)
 
-    # First try direct match
-    # citycode = city_data.get(cityname)
-    # if citycode:
-    #     return citycode
-
-    # If no direct match, use DeepSeek API for intelligent matching
     try:
         # Get an example city code for the prompt
         example_city = next(iter(city_data.items()))
@@ -90,10 +84,12 @@ def get_citycode(cityname):
             3. Consider both traditional and simplified Chinese characters
             4. Match partial names if they are unique (e.g., "东京" should match "东京")
             5. If multiple matches exist, choose the most common/popular one
+            6. If no match is found in the provided data, use your knowledge to provide the most likely IATA city code
             
             Example responses:
             - For a match: {example_response}
-            - For no match: {not_found_response}"""},
+            - For no match but you know the code: {{"citycode": "LHR"}}  # Example for London Heathrow
+            - For no match and unknown: {not_found_response}"""},
             {"role": "user", "content": f"""Given the following city name: "{cityname}", find the most likely matching city code from this list:
             {json.dumps(city_data, ensure_ascii=False, indent=2)}
             
@@ -103,8 +99,9 @@ def get_citycode(cityname):
             3. Common abbreviations and alternative names
             4. Common typos and misspellings
             5. Partial matches if they are unique
+            6. If no match is found in the data, use your knowledge to provide the most likely IATA city code
             
-            Return ONLY a JSON object with a single field 'citycode' containing the matched code or 'NOT_FOUND'.
+            Return ONLY a JSON object with a single field 'citycode' containing the matched code or your best guess.
             Example format: {example_response}"""}
         ]
 
@@ -127,6 +124,8 @@ def get_citycode(cityname):
                 for code in city_data.values():
                     if code.lower() in matched_code.lower() or matched_code.lower() in code.lower():
                         return code
+                # If no close match found but DeepSeek provided a code, use it
+                return matched_code
 
             print(f"DeepSeek API matching failed for city: {cityname}")
             return None
@@ -138,9 +137,94 @@ def get_citycode(cityname):
         print(f"Error in intelligent city matching: {str(e)}")
         return None
 
+def get_airlinecode(airline_name):
+    """Get airline code with intelligent matching using DeepSeek API"""
+    with open('assets/airline.json', 'r', encoding='utf-8') as json_file:
+        airline_data = json.load(json_file)
+
+    try:
+        # Get an example airline code for the prompt
+        example_airline = next(iter(airline_data.items()))
+        example_response = json.dumps({"airlinecode": example_airline[1]}, ensure_ascii=False)
+        not_found_response = json.dumps({"airlinecode": "NOT_FOUND"}, ensure_ascii=False)
+
+        # Prepare the prompt for DeepSeek
+        messages = [
+            {"role": "system", "content": f"""You are a helpful assistant that matches airline names to their codes.
+            You must ALWAYS respond in JSON format with a single field 'airlinecode'.
+            
+            Important matching rules:
+            1. Match should be case-insensitive
+            2. Consider both traditional and simplified Chinese characters
+            3. Match partial names if they are unique
+            4. If multiple matches exist, choose the most common/popular one
+            5. For multiple airlines, return a comma-separated list of codes
+            6. If no match is found in the provided data, use your knowledge to provide the most likely IATA airline code
+            
+            Example responses:
+            - For a match: {example_response}
+            - For no match but you know the code: {{"airlinecode": "BA"}}  # Example for British Airways
+            - For no match and unknown: {not_found_response}"""},
+            {"role": "user", "content": f"""Given the following airline name(s): "{airline_name}", find the most likely matching airline code(s) from this list:
+            {json.dumps(airline_data, ensure_ascii=False, indent=2)}
+            
+            Matching considerations:
+            1. Traditional/Simplified Chinese variations
+            2. Common abbreviations and alternative names
+            3. Common typos and misspellings
+            4. Partial matches if they are unique
+            5. For multiple airlines, return comma-separated codes
+            6. If no match is found in the data, use your knowledge to provide the most likely IATA airline code
+            
+            Return ONLY a JSON object with a single field 'airlinecode' containing the matched code(s) or your best guess.
+            Example format: {example_response}"""}
+        ]
+
+        print(f"Attempting to match airline: {airline_name}")
+        response = client.chat.completions.create(
+            messages=messages,
+            **settings
+        )
+
+        try:
+            result = json.loads(response.choices[0].message.content)
+            matched_codes = result.get('airlinecode')
+            print(f"DeepSeek matched code(s): {matched_codes}")
+            
+            if matched_codes == 'NOT_FOUND':
+                return None
+                
+            # Split multiple codes if present
+            codes = [code.strip() for code in matched_codes.split(',')]
+            
+            # Verify all codes exist in our data
+            valid_codes = []
+            for code in codes:
+                if code in airline_data.values():
+                    valid_codes.append(code)
+                else:
+                    # Try to find closest match
+                    for valid_code in airline_data.values():
+                        if valid_code.lower() in code.lower() or code.lower() in valid_code.lower():
+                            valid_codes.append(valid_code)
+                            break
+                    # If no close match found but DeepSeek provided a code, use it
+                    if not any(valid_code.lower() in code.lower() or code.lower() in valid_code.lower() for valid_code in airline_data.values()):
+                        valid_codes.append(code)
+            
+            return ','.join(valid_codes) if valid_codes else None
+            
+        except json.JSONDecodeError as e:
+            print(f"Error parsing JSON response: {str(e)}")
+            return None
+
+    except Exception as e:
+        print(f"Error in intelligent airline matching: {str(e)}")
+        return None
+
 def build_kayak_url(origin_code, dest_code, departure_date, return_date=None, 
                    adults=1, students=0, youth=0, children=0, seated_infant=0, lap_infant=0,
-                   cabin_class=CabinClass.ECONOMY):
+                   cabin_class=CabinClass.ECONOMY, airlines=None):
     """
     Build Kayak flight search URL
     
@@ -157,6 +241,9 @@ def build_kayak_url(origin_code, dest_code, departure_date, return_date=None,
     - premium: Premium economy
     - business: Business class
     - first: First class
+    
+    Airlines:
+    - Comma-separated list of airline codes (e.g., "MU,CX,CZ")
     """
     # Base URL
     base_url = "https://www.kayak.com.hk/flights"
@@ -182,7 +269,7 @@ def build_kayak_url(origin_code, dest_code, departure_date, return_date=None,
     # Add adults (18+)
     if adults > 0:
         passenger_parts.append(f"{adults}adults")
-    
+
     # Add students (18+ with student ID)
     if students > 0:
         passenger_parts.append(f"{students}students")
@@ -205,10 +292,14 @@ def build_kayak_url(origin_code, dest_code, departure_date, return_date=None,
     passenger_part = "/".join(passenger_parts)
 
     # Build query parameters
-    query_params = "sort=price_a"
+    query_params = ["sort=price_a"]
+    
+    # Add airline filter if specified
+    if airlines:
+        query_params.append(f"fs=airlines={airlines}")
 
     # Combine complete URL
-    return f"{base_url}/{route}/{date_part}/{passenger_part}?{query_params}&fs=stops=~0"
+    return f"{base_url}/{route}/{date_part}/{passenger_part}?{'&'.join(query_params)}"
 
 class FlightInfo(BaseModel):
     departure_time: str
@@ -229,9 +320,18 @@ class FlightResponse(BaseModel):
     outbound_flight: FlightInfo
     return_flight: Optional[FlightInfo] = None
 
-def get_flight_info(origin_city, destination_city, departure_date, return_date=None, adults=1, students=0, youth=0, children=0, seated_infant=0, lap_infant=0, cabin_class=CabinClass.ECONOMY):
+def get_flight_info(origin_city, destination_city, departure_date, return_date=None, 
+                   adults=1, students=0, youth=0, children=0, seated_infant=0, lap_infant=0, 
+                   cabin_class=CabinClass.ECONOMY, airlines=None):
     origin_code = get_citycode(origin_city)
     dest_code = get_citycode(destination_city)
+    
+    # Get airline codes if specified
+    airline_codes = None
+    if airlines:
+        airline_codes = get_airlinecode(airlines)
+        if not airline_codes:
+            print(f"Warning: Could not match airline codes for: {airlines}")
 
     # Build dynamic URL
     url = build_kayak_url(
@@ -245,7 +345,8 @@ def get_flight_info(origin_city, destination_city, departure_date, return_date=N
         children=children,
         seated_infant=seated_infant,
         lap_infant=lap_infant,
-        cabin_class=cabin_class
+        cabin_class=cabin_class,
+        airlines=airline_codes
     )
 
     print(url)
@@ -281,8 +382,8 @@ def get_flight_info(origin_city, destination_city, departure_date, return_date=N
         # Get price
         try:
             price_element = wait.until(
-                EC.visibility_of_element_located((By.CSS_SELECTOR, "div.e2GB-price-text"))
-            )
+            EC.visibility_of_element_located((By.CSS_SELECTOR, "div.e2GB-price-text"))
+        )
             price = price_element.text.replace("HK$", "").replace(",", "").strip()
             print(f"Found price: {price}")
         except Exception as e:
@@ -377,6 +478,7 @@ class FlightRequest(BaseModel):
     seated_infant: Optional[int] = 0
     lap_infant: Optional[int] = 0
     cabin_class: Optional[CabinClass] = CabinClass.ECONOMY
+    airlines: Optional[str] = None  # Comma-separated airline names or codes
 
 '''
 EXAMPLE:
@@ -391,7 +493,8 @@ EXAMPLE:
     "children": 1,                # 2-11 years old (code: 11)
     "seated_infant": 1,           # Under 2 years old, requires seat (code: 1S)
     "lap_infant": 1,              # Under 2 years old, sits on lap (code: 1L)
-    "cabin_class": "business"     # Optional: economy, premium, business, first
+    "cabin_class": "business",    # Optional: economy, premium, business, first
+    "airlines": "MU,CX,CZ"        # Optional: Comma-separated airline names or codes
 }
 '''
 
@@ -409,7 +512,8 @@ async def check_flight_info(request: FlightRequest):
             children=request.children,
             seated_infant=request.seated_infant,
             lap_infant=request.lap_infant,
-            cabin_class=request.cabin_class
+            cabin_class=request.cabin_class,
+            airlines=request.airlines
         )
         
         if result is None or result["outbound_flight"] is None:

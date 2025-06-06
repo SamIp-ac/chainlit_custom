@@ -1,10 +1,20 @@
-# chainlit run demo.py -w --host 0.0.0.0 --port 8000
+# chainlit run demo_audio.py -w --host 0.0.0.0 --port 8000
 import chainlit as cl
 from mcp import ClientSession
 from openai import AsyncOpenAI
 import os
 import pdfplumber
 from io import BytesIO
+import asyncio
+import numpy as np
+import wave
+import tempfile
+from faster_whisper import WhisperModel
+import edge_tts
+import json
+
+# === 语音识别配置 ===
+WHISPER_MODEL = WhisperModel("small", device="cpu", compute_type="int8")  # 使用base模型更快
 
 # === Setup DeepSeek API ===
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-a194d0c4c5364185ac916b8e19c65566")
@@ -82,8 +92,37 @@ async def call_tool(tool_use):
     result = await mcp_session.call_tool(tool_name, tool_input)
     return result
 
+# === Audio Process ===
+async def transcribe_audio(audio_data: bytes) -> str:
+    """使用本地Whisper模型转录音频"""
+    with tempfile.NamedTemporaryFile(suffix=".wav") as tmp_file:
+        # 写入WAV文件
+        with wave.open(tmp_file.name, 'wb') as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(16000)
+            wav.writeframes(audio_data)
+        
+        # 转录
+        segments, _ = WHISPER_MODEL.transcribe(tmp_file.name, language="zh")
+        return " ".join([seg.text for seg in segments])
 
-# TODO: for general file upload : https://docs.chainlit.io/advanced-features/multi-modal
+async def text_to_speech(text: str) -> bytes:
+    """使用edge-tts合成语音"""
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
+        tmp_path = tmp_file.name
+    
+    # 中文语音合成
+    voice = "zh-CN-YunxiNeural"  # 微软云晓青年音
+    communicate = edge_tts.Communicate(text, voice)
+    await communicate.save(tmp_path)
+    
+    with open(tmp_path, "rb") as f:
+        audio_data = f.read()
+    os.unlink(tmp_path)
+    return audio_data
+
+
 MAX_HISTORY = 6  # Number of previous messages to keep
 
 def get_chat_history():
@@ -95,6 +134,171 @@ def add_to_chat_history(role: str, content: str):
     # Keep only the latest N messages
     history = history[-MAX_HISTORY:]
     cl.user_session.set("chat_history", history)
+
+# === 核心交互逻辑 ===
+@cl.on_chat_start
+async def start():
+    cl.user_session.set("chat_history", [])
+    cl.user_session.set("audio_chunks", [])
+
+@cl.on_audio_start
+async def on_audio_start():
+    cl.user_session.set("audio_chunks", [])
+    return True
+
+@cl.on_audio_chunk
+async def on_audio_chunk(chunk: cl.InputAudioChunk):
+    audio_chunks = cl.user_session.get("audio_chunks")
+    audio_chunks.append(chunk.data)
+    cl.user_session.set("audio_chunks", audio_chunks)
+
+@cl.on_audio_end
+async def on_audio_end():
+    if audio_chunks := cl.user_session.get("audio_chunks"):
+        # 拼接音频数据
+        audio_data = b"".join(audio_chunks)
+        
+        # 转录音频
+        transcription = await transcribe_audio(audio_data)
+        if not transcription:
+            await cl.Message(content="❌ 未能识别语音").send()
+            return
+            
+        # 显示用户语音输入（作为用户消息）
+        user_msg = cl.Message(
+            author="User",
+            content=transcription,
+            elements=[cl.Audio(mime="audio/wav", content=audio_data)]
+        )
+        await user_msg.send()
+        
+        # 调用LLM生成回复
+        await generate_response(transcription)
+
+async def generate_response(query: str) -> str:
+    """使用DeepSeek生成回复，支持工具调用"""
+    # Step 1: Gather tools
+    mcp_tools = cl.user_session.get("mcp_tools", {})
+    tool_defs = [
+        {
+            "type": "function",
+            "function": {
+                "name": t["name"],
+                "description": t["description"],
+                "parameters": t["input_schema"]
+            }
+        }
+        for conn_tools in mcp_tools.values() for t in conn_tools
+    ]
+
+    # Step 2: Build history + new message
+    history = get_chat_history()
+    history.append({"role": "user", "content": query})
+
+    # Step 3: Prepare base messages
+    base_messages = [
+        {"role": "system", "content": "You are a helpful assistant of FUJIFILM Business Innovation, you will use the same language as user to answer the question, the newest chat history at last."}
+    ] + history
+
+    # Step 4: Send to LLM with or without tools
+    if tool_defs:
+        response = await client.chat.completions.create(
+            messages=base_messages,
+            tools=tool_defs,
+            tool_choice="auto",
+            **settings
+        )
+    else:
+        response = await client.chat.completions.create(
+            messages=base_messages,
+            **settings
+        )
+
+    msg = response.choices[0].message
+    tool_outputs = []
+
+    # Step 5: If tools were used
+    if msg.tool_calls:
+        for tool_call in msg.tool_calls:
+            tool_use = {
+                "name": tool_call.function.name,
+                "input": tool_call.function.arguments
+            }
+            result = await call_tool(tool_use)
+
+            # Extract result
+            if isinstance(result, dict) and "content" in result:
+                content_items = result["content"]
+                if isinstance(content_items, list) and len(content_items) > 0:
+                    result_text = content_items[0].text
+                else:
+                    result_text = str(result)
+            else:
+                result_text = str(result)
+
+            tool_outputs.append({
+                "name": tool_use["name"],
+                "result": result_text
+            })
+
+            await cl.Message(content=f"Tool `{tool_use['name']}` response:\n```json\n{result_text}\n```").send()
+
+        # Step 6: Summarize tool results into a final answer
+        summary_prompt = f"""
+        User Question:
+        {query}
+
+        Tool Results:
+        """
+        for output in tool_outputs:
+            summary_prompt += f"\nTool: {output['name']}\nResult:\n{output['result']}\n"
+
+        summary_prompt += """
+        Instructions:
+        1. Carefully read the tool outputs above.
+        2. Use ONLY the information in the tool results to answer the user's question.
+        3. Do NOT repeat tool results unless necessary — instead, directly answer the user.
+        4. Write the answer in the same language used in the user's question.
+        5. If the tool results are incomplete or unclear, politely indicate so.
+
+        Answer:
+        """
+        summary_response = await client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that answers user questions using only the results from tools. Use the same language as the user."},
+                {"role": "user", "content": summary_prompt}
+            ],
+            **settings
+        )
+
+        reply = summary_response.choices[0].message.content
+        await cl.Message(content=f"🔍 Summary:\n{reply}").send()
+    else:
+        # No tool call, just use model response
+        reply = msg.content
+        await cl.Message(content=reply).send()
+
+    # Store in history
+    add_to_chat_history("assistant", reply)
+    
+    # 生成并播放语音回复
+    audio_data = await text_to_speech(reply)
+    await cl.Message(
+        content="",
+        elements=[cl.Audio(auto_play=True, mime="audio/wav", content=audio_data)]
+    ).send()
+    
+    return reply
+
+async def play_tts(text: str):
+    """合成并播放语音"""
+    audio_data = await text_to_speech(text)
+    await cl.Message(
+        content=text,
+        elements=[cl.Audio(auto_play=True, mime="audio/wav", content=audio_data)]
+    ).send()
+
+
 
 # === Handle message and tools with LLM ===
 @cl.on_message

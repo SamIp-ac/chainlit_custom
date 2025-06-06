@@ -49,3 +49,6 @@ On localhost:8000 Register your api by http://[HOST]:[PORT]/mcp
 
 ## some idea
 - maybe try to add re-try/reasoning whenever the answer is not good enough in self-evaluation
+
+## EXAMPLE
+- 2025年7月5日到7月10日，两个大人从香港去曼谷游玩，帮我规划行程并列出大概开销
